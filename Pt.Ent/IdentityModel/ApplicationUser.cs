@@ -20,6 +20,7 @@ namespace Pt.Ent.IdentityModel
         public DateTime RegisterDate { get; set; } = DateTime.Now; //Autosetter
         public int? DepartmentId { get; set; }
         public decimal Salary { get; set; }
+        public string ActivationCode { get; set; }
         [ForeignKey("DepartmentId")]
         public virtual Department Department { get; set; } = new Department();
 
