@@ -14,9 +14,9 @@ namespace Pt.Ent.ViewModel
         [StringLength(25)]
         public string Name { get; set; }
 
+        [StringLength(35)]
         [Required]
         [Display(Name = "Soyad")]
-        [StringLength(35)]
         public string SurName { get; set; }
 
         [Required]
@@ -28,14 +28,14 @@ namespace Pt.Ent.ViewModel
         public string Email { get; set; }
 
         [Required]
+        [StringLength(100, MinimumLength = 5, ErrorMessage = "Şifreniz en az 5 karakter olmalıdır!")]
         [Display(Name = "Şifre")]
-        [StringLength(100,MinimumLength =5,ErrorMessage ="Şifreniz en az 5 karakter olmalıdır!")]
         [DataType(DataType.Password)]
         public string Password { get; set; }
 
         [Required]
-        [Display(Name = "Şifre Tekrar")]
         [DataType(DataType.Password)]
+        [Display(Name = "Şifre Tekrar")]
         [Compare("Password", ErrorMessage = "Şifreler uyuşmuyor!")]
         public string ConfirmPassword { get; set; }
     }

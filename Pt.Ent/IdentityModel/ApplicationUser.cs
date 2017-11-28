@@ -21,8 +21,9 @@ namespace Pt.Ent.IdentityModel
         public int? DepartmentId { get; set; }
         public decimal Salary { get; set; }
         public string ActivationCode { get; set; }
+
         [ForeignKey("DepartmentId")]
-        public virtual Department Department { get; set; } = new Department();
+        public virtual Department Department { get; set; }
 
         public virtual List<LaborLog> LaberLogs { get; set; } = new List<LaborLog>();
         public virtual List<SalaryLog> SalaryLogs { get; set; } = new List<SalaryLog>();

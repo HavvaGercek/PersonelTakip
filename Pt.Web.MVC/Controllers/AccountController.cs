@@ -21,43 +21,50 @@ namespace Pt.Web.MVC.Controllers
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]//form post yaparken (cfrs) sessionda bir kod(token) üretiyor ve işlemleri yaparken kod ile sessiondan kontrol ediyor.
+        [ValidateAntiForgeryToken]
         public async Task<ActionResult> Register(RegisterViewModel model)
         {
             //kayıt olmadan önce kontrol ediliyor
             if (!ModelState.IsValid)
                 return View(model);
-
             var userManager = MembershipTools.NewUserManager();
             var checkUser = userManager.FindByName(model.UserName);
             if (checkUser != null)
             {
-                ModelState.AddModelError(string.Empty, "Bu kullanıcı zaten kayıtlı");
+                ModelState.AddModelError(string.Empty, "Bu kullanıcı zaten kayıtlı!");
                 return View(model);
             }
-
-            //register işlemi yapılır
+            // register işlemi yapılır
             var activationCode = Guid.NewGuid().ToString();
-            ApplicationUser user = new ApplicationUser() {
-                Name=model.Name,
-                SurName=model.SurName,
-                UserName=model.UserName,
-                Email=model.Email,
-                ActivationCode=activationCode
+            ApplicationUser user = new ApplicationUser()
+            {
+                Name = model.Name,
+                SurName = model.SurName,
+                Email = model.Email,
+                UserName = model.UserName,
+                ActivationCode = activationCode
             };
-            var response = userManager.Create(user, model.Password);
+            IdentityResult response = null;
+            try
+            {
+                response = userManager.Create(user, model.Password);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
             if (response.Succeeded)
             {
-                //heryerde çalışabilecek bir url oluşturuyoruz
-                string siteUrl = Request.Url.Scheme + Uri.SchemeDelimiter + Request.Url.Host + (Request.Url.IsDefaultPort ? "" : ":" + Request.Url.Port);
-
+                string siteUrl = Request.Url.Scheme + Uri.SchemeDelimiter + Request.Url.Host +
+                                 (Request.Url.IsDefaultPort ? "" : ":" + Request.Url.Port);
                 if (userManager.Users.Count() == 1)
                 {
                     userManager.AddToRole(user.Id, "Admin");
-                    await SiteSettings.SendMail(new MailModel {
-                        To=user.Email,
-                        Subject="Welcome",
-                        Message="Admin'e mesajjj",
+                    await SiteSettings.SendMail(new MailModel
+                    {
+                        To = user.Email,
+                        Subject = "Hoşgeldin Sahip",
+                        Message = "Sitemizi yöneteceğin için çok mutluyuz ^^"
                     });
                 }
                 else
@@ -66,19 +73,19 @@ namespace Pt.Web.MVC.Controllers
                     await SiteSettings.SendMail(new MailModel
                     {
                         To = user.Email,
-                        Subject = "Personel Yönetimi Aktivasyon",
-                        Message = $"Merhaba {user.Name} {user.SurName}<br/> Sistemi kullanabilmeniz için <a href='{siteUrl}/Account/Activation?code={activationCode}'>Aktivasyon Kodu</a>"
+                        Subject = "Personel Yönetimi - Aktivasyon",
+                        Message =
+                            $"Merhaba {user.Name} {user.SurName} <br/>Hesabınızı aktifleştirmek için <a href='{siteUrl}/Account/Activation?code={activationCode}'>Aktivasyon Kodu</a>"
                     });
                 }
+
                 return RedirectToAction("Login", "Account");
             }
             else
             {
-                ModelState.AddModelError(string.Empty, "Kayıt işleminde bir hata oluştu");
+                ModelState.AddModelError(string.Empty, "Kayıt İşleminde bir hata oluştu");
                 return View(model);
             }
-
-            
         }
     }
 }
