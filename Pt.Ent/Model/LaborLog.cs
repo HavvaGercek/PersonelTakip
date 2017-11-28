@@ -17,7 +17,7 @@ namespace Pt.Ent.Model
         [Required]
         public string UserId { get; set; }
 
-        [ForeignKey("UserdId")]
+        [ForeignKey("UserId")]
         public virtual ApplicationUser User{ get; set; }
     }
 }
