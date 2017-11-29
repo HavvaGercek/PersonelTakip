@@ -24,6 +24,10 @@ namespace Pt.BL.Settings
                 var message = new MailMessage();
                 message.To.Add(new MailAddress(model.To));
                 message.From = new MailAddress(SiteMail);
+                if (!string.IsNullOrEmpty(model.Cc))
+                    message.CC.Add(new MailAddress(model.Cc));
+                if (!string.IsNullOrEmpty(model.Bcc))
+                    message.Bcc.Add(new MailAddress(model.Bcc));
                 message.Subject = model.Subject;
                 message.IsBodyHtml = true;
                 message.Body = model.Message;
@@ -41,6 +45,6 @@ namespace Pt.BL.Settings
 
         }
 
-       
+
     }
 }

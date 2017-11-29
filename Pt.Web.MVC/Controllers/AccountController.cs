@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNet.Identity;
+using Microsoft.Owin.Security;
 using Pt.BL.AccountRepository;
 using Pt.BL.Settings;
 using Pt.Ent.IdentityModel;
@@ -34,6 +35,14 @@ namespace Pt.Web.MVC.Controllers
                 ModelState.AddModelError(string.Empty, "Bu kullanıcı zaten kayıtlı!");
                 return View(model);
             }
+
+            checkUser = userManager.FindByEmail(model.Email);
+            if(checkUser != null)
+            {
+                ModelState.AddModelError(string.Empty, "Bu eposta adersi kullanılmakta");
+                return View(model);
+            }
+            
             // register işlemi yapılır
             var activationCode = Guid.NewGuid().ToString();
             ApplicationUser user = new ApplicationUser()
@@ -44,15 +53,9 @@ namespace Pt.Web.MVC.Controllers
                 UserName = model.UserName,
                 ActivationCode = activationCode
             };
-            IdentityResult response = null;
-            try
-            {
-                response = userManager.Create(user, model.Password);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
+
+            var response = userManager.Create(user, model.Password);
+
             if (response.Succeeded)
             {
                 string siteUrl = Request.Url.Scheme + Uri.SchemeDelimiter + Request.Url.Host +
@@ -86,6 +89,108 @@ namespace Pt.Web.MVC.Controllers
                 ModelState.AddModelError(string.Empty, "Kayıt İşleminde bir hata oluştu");
                 return View(model);
             }
+        }
+
+
+        public ActionResult Login()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> Login(LoginViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+            var userManager = MembershipTools.NewUserManager();
+            var user = await userManager.FindAsync(model.UserName, model.Password);
+            if (user == null)
+            {
+                ModelState.AddModelError(string.Empty, "kullanıcı yok");
+                return View(model);
+            }
+            var authManager = HttpContext.GetOwinContext().Authentication;
+            var userIdentity = await userManager.CreateIdentityAsync(user, DefaultAuthenticationTypes.ApplicationCookie);
+            authManager.SignIn(new AuthenticationProperties
+            {
+                IsPersistent=model.RememberMe
+            }, userIdentity);
+            return RedirectToAction("Index","Home");
+        }
+
+        [Authorize]//signin yapılmış mı ona bakar yapılmışsa altındakini çalıştırır
+        public ActionResult Logout()
+        {
+            var authManager = HttpContext.GetOwinContext().Authentication;
+            authManager.SignOut();
+            return RedirectToAction("Login", "Account");
+        }
+
+        public async Task<ActionResult> Activation(string code)
+        {
+            var userStore = MembershipTools.NewUserStore();
+            var userManager = new UserManager<ApplicationUser>(userStore);
+            var sonuc = userStore.Context.Set<ApplicationUser>().FirstOrDefault(x => x.ActivationCode == code);
+            if (sonuc == null)
+            {
+                ViewBag.sonuc = "Aktivasyon işlemi başarısız";
+                return View();
+            }
+            sonuc.EmailConfirmed = true;
+            await userStore.UpdateAsync(sonuc);
+            await userStore.Context.SaveChangesAsync();
+
+            userManager.RemoveFromRole(sonuc.Id, "Passive");
+            userManager.AddToRole(sonuc.Id, "User");
+
+            ViewBag.sonuc = $"Merhaba{sonuc.Name} {sonuc.SurName} kayıt aktivaston işleminiz başarılı olmuştur.";
+
+            await SiteSettings.SendMail(new MailModel()
+            {
+                To = sonuc.Email,
+                Message = ViewBag.sonuc.ToString(),
+                Subject = "Aktivasyon",
+                Bcc="havva.gercek@gmail.com"
+
+            });
+            return View();
+        }
+
+        public ActionResult RecoverPassword()
+        {
+            return View();
+
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> RecoverPassword(string email)
+        {
+            var userStore = MembershipTools.NewUserStore();
+            var userManager = new UserManager<ApplicationUser>(userStore);
+            var sonuc = userStore.Context.Set<ApplicationUser>().FirstOrDefault(x => x.Email == email);
+            if (sonuc == null)
+            {
+                ViewBag.sonuc = "email adresiniz kayıtlı değil";
+                return View();
+            }
+            var randomPas = Guid.NewGuid().ToString().Replace("-", "").Substring(0, 6);
+            await userStore.SetPasswordHashAsync(sonuc, userManager.PasswordHasher.HashPassword(randomPas));
+            await userStore.UpdateAsync(sonuc);
+            await userStore.Context.SaveChangesAsync();
+
+            await SiteSettings.SendMail(new MailModel()
+            {
+                To = sonuc.Email,
+                Subject = "Şifreniz değiştirildi",
+                Message = $"Merhaba {sonuc.Name} {sonuc.SurName} yeni şifreniz:<b>{randomPas}</b> olmuştur"
+            });
+            ViewBag.sonuc = "Email adresinize yeni şifre gönderilmiştir";
+            return View();
+
         }
     }
 }
