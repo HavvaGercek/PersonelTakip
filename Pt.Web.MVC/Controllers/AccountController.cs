@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Mvc;
+using static System.Net.WebRequestMethods;
 
 namespace Pt.Web.MVC.Controllers
 {
@@ -190,6 +191,77 @@ namespace Pt.Web.MVC.Controllers
             });
             ViewBag.sonuc = "Email adresinize yeni şifre gönderilmiştir";
             return View();
+
+        }
+
+        [Authorize]
+        public ActionResult Profile()
+        {
+            var userManager = MembershipTools.NewUserManager();
+            var user = userManager.FindById(HttpContext.GetOwinContext().Authentication.User.Identity.GetUserId());
+            var model = new ProfileViewModel()
+            {
+                Id = user.Id,
+                Email = user.Email,
+                Name=user.Name,
+                SurName=user.SurName,
+                UserName=user.UserName
+            };
+
+            return View(model);
+        }
+
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> Profile(ProfileViewModel model)
+        {
+            if (!ModelState.IsValid) return View(model);
+
+            var userStore = MembershipTools.NewUserStore();
+            var userManager = new UserManager<ApplicationUser>(userStore);
+            var user = userManager.FindById(model.Id);
+            user.Name = model.Name;
+            user.SurName = model.SurName;
+            if (user.Email != model.Email)
+            {
+                user.Email = model.Email;
+                if (HttpContext.User.IsInRole("Admin"))
+                {
+                    userManager.RemoveFromRole(user.Id, "Admin");
+                }
+                else if(HttpContext.User.IsInRole("User"))
+                {
+                    userManager.RemoveFromRole(user.Id, "User");
+                }
+                userManager.AddToRole(user.Id, "Passive");
+                
+                user.ActivationCode = Guid.NewGuid().ToString().Replace("-", "");
+                string siteUrl = Request.Url.Scheme + Uri.SchemeDelimiter + Request.Url.Host +
+                                (Request.Url.IsDefaultPort ? "" : ":" + Request.Url.Port);
+
+                await SiteSettings.SendMail(new MailModel()
+                {
+                    To = user.Email,
+                    Subject = "Personel Yönetimi - Aktivasyon",
+                    Message = $"Merhaba {user.Name} {user.SurName} email adresinizi değiştirdiğiniz için tekrar aktive etmelisiniz: <a href='{siteUrl}/Account/Activation?code={user.ActivationCode}'>Aktivasyon Kodu</a>",
+                    
+                });
+            }
+          
+            await userStore.UpdateAsync(user);
+            await userStore.Context.SaveChangesAsync();
+
+            var model1 = new ProfileViewModel()
+            {
+                Id = user.Id,
+                Email = user.Email,
+                Name = user.Name,
+                SurName = user.SurName,
+                UserName = user.UserName
+            };
+            ViewBag.sonuc = "Bilgileriniz güncellenmiştir";
+            return View(model1);
 
         }
     }
