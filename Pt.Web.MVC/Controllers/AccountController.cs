@@ -199,13 +199,17 @@ namespace Pt.Web.MVC.Controllers
         {
             var userManager = MembershipTools.NewUserManager();
             var user = userManager.FindById(HttpContext.GetOwinContext().Authentication.User.Identity.GetUserId());
-            var model = new ProfileViewModel()
+            var model = new ProfilePasswordViewModel()
             {
-                Id = user.Id,
-                Email = user.Email,
-                Name=user.Name,
-                SurName=user.SurName,
-                UserName=user.UserName
+                profileModel=new ProfileViewModel
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    Name = user.Name,
+                    SurName = user.SurName,
+                    UserName = user.UserName
+                }
+              
             };
 
             return View(model);
@@ -214,55 +218,101 @@ namespace Pt.Web.MVC.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Profile(ProfileViewModel model)
+        public async Task<ActionResult> Profile(ProfilePasswordViewModel model)
         {
             if (!ModelState.IsValid) return View(model);
-
-            var userStore = MembershipTools.NewUserStore();
-            var userManager = new UserManager<ApplicationUser>(userStore);
-            var user = userManager.FindById(model.Id);
-            user.Name = model.Name;
-            user.SurName = model.SurName;
-            if (user.Email != model.Email)
+            try
             {
-                user.Email = model.Email;
-                if (HttpContext.User.IsInRole("Admin"))
+                var userStore = MembershipTools.NewUserStore();
+                var userManager = new UserManager<ApplicationUser>(userStore);
+                var user = userManager.FindById(model.profileModel.Id);
+                user.Name = model.profileModel.Name;
+                user.SurName = model.profileModel.SurName;
+                if (user.Email != model.profileModel.Email)
                 {
-                    userManager.RemoveFromRole(user.Id, "Admin");
-                }
-                else if(HttpContext.User.IsInRole("User"))
-                {
-                    userManager.RemoveFromRole(user.Id, "User");
-                }
-                userManager.AddToRole(user.Id, "Passive");
-                
-                user.ActivationCode = Guid.NewGuid().ToString().Replace("-", "");
-                string siteUrl = Request.Url.Scheme + Uri.SchemeDelimiter + Request.Url.Host +
-                                (Request.Url.IsDefaultPort ? "" : ":" + Request.Url.Port);
+                    user.Email = model.profileModel.Email;
+                    if (HttpContext.User.IsInRole("Admin"))
+                    {
+                        userManager.RemoveFromRole(user.Id, "Admin");
+                    }
+                    else if (HttpContext.User.IsInRole("User"))
+                    {
+                        userManager.RemoveFromRole(user.Id, "User");
+                    }
+                    userManager.AddToRole(user.Id, "Passive");
 
-                await SiteSettings.SendMail(new MailModel()
+                    user.ActivationCode = Guid.NewGuid().ToString().Replace("-", "");
+                    string siteUrl = Request.Url.Scheme + Uri.SchemeDelimiter + Request.Url.Host +
+                                    (Request.Url.IsDefaultPort ? "" : ":" + Request.Url.Port);
+
+                    await SiteSettings.SendMail(new MailModel()
+                    {
+                        To = user.Email,
+                        Subject = "Personel Yönetimi - Aktivasyon",
+                        Message = $"Merhaba {user.Name} {user.SurName} email adresinizi değiştirdiğiniz için tekrar aktive etmelisiniz: <a href='{siteUrl}/Account/Activation?code={user.ActivationCode}'>Aktivasyon Kodu</a>",
+
+                    });
+                }
+
+                await userStore.UpdateAsync(user);
+                await userStore.Context.SaveChangesAsync();
+
+                var model1 = new ProfilePasswordViewModel()
                 {
-                    To = user.Email,
-                    Subject = "Personel Yönetimi - Aktivasyon",
-                    Message = $"Merhaba {user.Name} {user.SurName} email adresinizi değiştirdiğiniz için tekrar aktive etmelisiniz: <a href='{siteUrl}/Account/Activation?code={user.ActivationCode}'>Aktivasyon Kodu</a>",
-                    
-                });
+                    profileModel = new ProfileViewModel
+                    {
+                        Id = user.Id,
+                        Email = user.Email,
+                        Name = user.Name,
+                        SurName = user.SurName,
+                        UserName = user.UserName
+                    }
+
+                };
+                ViewBag.sonuc = "Bilgileriniz güncellenmiştir";
+                return View(model1);
             }
-          
-            await userStore.UpdateAsync(user);
-            await userStore.Context.SaveChangesAsync();
-
-            var model1 = new ProfileViewModel()
+            catch (Exception ex)
             {
-                Id = user.Id,
-                Email = user.Email,
-                Name = user.Name,
-                SurName = user.SurName,
-                UserName = user.UserName
-            };
-            ViewBag.sonuc = "Bilgileriniz güncellenmiştir";
-            return View(model1);
+                ViewBag.sonuc = ex.Message;
+                return View(model);
+            }
+           
+        }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> UpdatePassword(ProfilePasswordViewModel model)
+        {
+
+            if (model.passwordModel.NewPassword!=model.passwordModel.NewPasswordConfirm) {
+                ModelState.AddModelError(string.Empty, "Şifreler uyuşmuyor");
+                return View("Profile", model);
+            }
+                try
+            {
+                var userStore = MembershipTools.NewUserStore();
+                var userManager = new UserManager<ApplicationUser>(userStore);
+                var user = userManager.FindById(model.profileModel.Id);
+                user = userManager.Find(user.UserName, model.passwordModel.OldPassword);
+                if (user == null)
+                {
+                    ModelState.AddModelError(string.Empty, "Şifrenizi yanlış girdiniz");
+                    return View("Profile",model);
+                }
+                await userStore.SetPasswordHashAsync(user, userManager.PasswordHasher.HashPassword(model.passwordModel.NewPassword));
+                await userStore.UpdateAsync(user);
+                await userStore.Context.SaveChangesAsync();
+
+                HttpContext.GetOwinContext().Authentication.SignOut();
+                return RedirectToAction("Profile");
+            }
+            catch(Exception ex)
+            {
+                ViewBag.sonuc = "günceleştirilemedi"+ex.Message;
+                return View("Profile",model);
+            }
+                
         }
     }
 }
