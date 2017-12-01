@@ -1,0 +1,49 @@
+﻿@model Pt.Ent.ViewModel.UsersViewModel
+@{
+    ViewBag.Title = $"Profil Düzenle-{Model.UserName}";
+}
+
+<h2>@Model.Name @Model.Surname</h2>
+<div class="row">
+
+        <div class="col-md-offset-3 col-md-6">
+            @using (Html.BeginForm("EditUser", "Admin", FormMethod.Post))
+            {
+                @Html.AntiForgeryToken()
+                @Html.HiddenFor(x=>x.UserId)
+                <div class="form-group">
+                    @Html.LabelFor(x => x.UserName)
+                    @Html.TextBoxFor(x => x.UserName, new { @class = "form-control", placeholder = "Kullanıcı Adı" })
+                </div>
+                <div class="form-group">
+                    @Html.LabelFor(x => x.Name)
+                    @Html.TextBoxFor(x => x.Name, new { @class = "form-control", placeholder = "Ad" })
+                </div>
+                <div class="form-group">
+                    @Html.LabelFor(x => x.Surname)
+                    @Html.TextBoxFor(x => x.Surname, new { @class = "form-control", placeholder = "Soyadı" })
+                </div>
+                <div class="form-group">
+                    @Html.LabelFor(x => x.Email)
+                    @Html.TextBoxFor(x => x.Email, new { @class = "form-control", placeholder = "E-mail" })
+                </div>
+                <div class="form-group">
+                    @Html.LabelFor(x => x.Salary)
+                    @Html.TextBoxFor(x => x.Salary, new { @class = "form-control", placeholder = "Maaş" })
+                </div>
+              
+                <div class="form-group">
+                    @Html.LabelFor(x => x.RoleName)
+                    @Html.DropDownListFor(x => x.RoleId,new SelectList(ViewBag.roles, "Value","Text"))
+                </div>
+                <div class="row">
+                    <div class="col-sm-6">
+                        <input type="submit" value="Guncelle" class="btn btn-success btn-block" />
+
+                    </div>
+                </div>
+            }
+
+        </div>
+    </div>
+
